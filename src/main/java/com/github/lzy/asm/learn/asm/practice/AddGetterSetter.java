@@ -9,8 +9,11 @@ import static org.objectweb.asm.Opcodes.IRETURN;
 import static org.objectweb.asm.Opcodes.PUTFIELD;
 import static org.objectweb.asm.Opcodes.RETURN;
 
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Method;
+import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -30,22 +33,25 @@ import net.bytebuddy.agent.ByteBuddyAgent;
 public class AddGetterSetter {
     public static void main(String[] args) {
         Instrumentation instrumentation = ByteBuddyAgent.install();
-        instrumentation.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            if (!className.startsWith("com/github/lzy")) {
-                return classfileBuffer;
-            } else {
-                try {
-                    ClassReader classReader = new ClassReader(classfileBuffer);
-                    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-                    classReader.accept(new SimpleAddGetterSetterVisitor(classWriter), 0);
-                    DumpUtils.dump(classWriter.toByteArray());
-                    return classWriter.toByteArray();
-                } catch (Exception e) {
-                    e.printStackTrace();
+        instrumentation.addTransformer(new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                    ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
+                if (!className.startsWith("com/github/lzy")) {
+                    return null;
+                } else {
+                    try {
+                        ClassReader classReader = new ClassReader(classfileBuffer);
+                        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                        classReader.accept(new SimpleAddGetterSetterVisitor(classWriter), 0);
+                        DumpUtils.dump(classWriter.toByteArray());
+                        return classWriter.toByteArray();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    return null;
                 }
-                return classfileBuffer;
             }
-
         });
         Method[] declaredMethods = TestClass.class.getDeclaredMethods();
         System.out.println(Arrays.toString(declaredMethods));

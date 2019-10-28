@@ -2,6 +2,9 @@ package com.github.lzy.asm.learn.asm.practice;
 
 import static org.objectweb.asm.Opcodes.ASM5;
 
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.IllegalClassFormatException;
+import java.security.ProtectionDomain;
 import java.util.Stack;
 
 import org.objectweb.asm.ClassReader;
@@ -18,17 +21,22 @@ import com.github.lzy.asm.learn.asm.tools.DumpUtils;
 
 public class MonitorClass {
     public static void main(String[] args) {
-        ClassTransform.addTransformer((loader, className, classBeingRedefined, protectionDomain, classfileBuffer) -> {
-            if (className != null && className.contains("TestClass")) {
-                ClassReader classReader = new ClassReader(classfileBuffer);
-                ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
-                MonitorVisitor monitorVisitor = new MonitorVisitor(classWriter);
-                classReader.accept(monitorVisitor, 0);
-                byte[] bytes = classWriter.toByteArray();
-                DumpUtils.dump(bytes);
-                return bytes;
-            } else {
-                return classfileBuffer;
+
+        ClassTransform.addTransformer(new ClassFileTransformer() {
+            @Override
+            public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined,
+                    ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
+                if (className != null && className.contains("TestClass")) {
+                    ClassReader classReader = new ClassReader(classfileBuffer);
+                    ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
+                    MonitorVisitor monitorVisitor = new MonitorVisitor(classWriter);
+                    classReader.accept(monitorVisitor, 0);
+                    byte[] bytes = classWriter.toByteArray();
+                    DumpUtils.dump(bytes);
+                    return bytes;
+                } else {
+                    return null;
+                }
             }
         });
         TestClass testClass = new TestClass();
